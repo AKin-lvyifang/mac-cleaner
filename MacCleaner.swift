@@ -143,7 +143,10 @@ final class Cleaner {
             let pids = Array(Set(roots.flatMap(tree))).filter { !protected.contains($0) && !listening.contains($0) }
             guard !pids.isEmpty else { return }
             let freed = pids.reduce(UInt64(0)) { $0 + (byPid[$1]?.footprint ?? 0) }
-            lines.append(Line(text: "\(label) ×\(roots.count)", freed: freed))
+            var names: [String: Int] = [:]
+            for r in roots { names[byPid[r]?.name ?? "?", default: 0] += 1 }
+            let detail = names.sorted { $0.value > $1.value }.map { $0.value > 1 ? "\($0.key)×\($0.value)" : $0.key }
+            lines.append(Line(text: "\(label)：" + detail.joined(separator: "、"), freed: freed))
             if dryRun { roots.forEach { print("  \(label): \($0) \(byPid[$0]?.path ?? "")") }; return }
             pids.forEach { Darwin.kill($0, SIGTERM) }
             Thread.sleep(forTimeInterval: 2)
@@ -232,9 +235,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 self.busy = false; self.last = lines; self.lastTime = Date()
                 self.refreshIcon()
-                let total = lines.reduce(UInt64(0)) { $0 + $1.freed }
-                self.item.button?.title = total > 0 ? " −" + fmt(total) : " ✓"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 8) { self.item.button?.title = "" }
+                self.showMenu()   // 清理完直接弹出明细
             }
         }
     }
